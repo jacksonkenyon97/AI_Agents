@@ -1,0 +1,8 @@
+def main() -> None:
+    """Run the NHL summary agent."""
+    # Call the agent's functions here once they are implemented.
+    pass
+
+
+if __name__ == "__main__":
+    main()
