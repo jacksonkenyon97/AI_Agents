@@ -1,0 +1,16 @@
+def main() -> None:
+    """Run the NHL summary agent."""
+    # Call the agent's functions here once they are implemented.
+    import LLM functions
+
+    NHL_Teams=["Dallas Stars","Tampa Bay Lightning","Utah Mammoths","Ottawa Senators"]
+    NBA_Teams=["Golden State Warriors"]
+    NFL_Teams=["San Francisco 49ers"]
+    get_rest_api()
+    llm_call()
+
+    pass
+
+
+if __name__ == "__main__":
+    main()

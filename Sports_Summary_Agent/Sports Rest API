@@ -1,0 +1,113 @@
+def get_api_results(teams):
+    import inspect
+    import json
+    from datetime import date, timedelta
+    from urllib.parse import urlencode
+    from urllib.request import Request, urlopen
+
+    sport_paths = {
+        "NHL_Teams": ("hockey", "nhl"),
+        "NBA_Teams": ("basketball", "nba"),
+        "NFL_Teams": ("football", "nfl"),
+    }
+
+    list_name = None
+    caller = inspect.currentframe().f_back
+    if caller is not None:
+        for name, value in caller.f_locals.items():
+            if value is teams and name in sport_paths:
+                list_name = name
+                break
+
+    if list_name is None:
+        raise ValueError(
+            "Pass NHL_Teams, NBA_Teams, or NFL_Teams so the sport can be selected by name."
+        )
+
+    sport, league = sport_paths[list_name]
+    team_names = {name.casefold() for name in teams}
+    end_date = date.today()
+    start_date = end_date - timedelta(days=6)
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "Sports-Summary-Agent/1.0",
+    }
+
+    def fetch_json(url):
+        request = Request(url, headers=headers)
+        with urlopen(request, timeout=20) as response:
+            return json.load(response)
+
+    def mentions_team(value):
+        text = json.dumps(value).casefold()
+        return any(team in text for team in team_names)
+
+    def filter_events(events):
+        matched = []
+        for event in events:
+            competitions = event.get("competitions") or [{}]
+            competitors = competitions[0].get("competitors", [])
+            names = [
+                competitor.get("team", {}).get("displayName", "")
+                for competitor in competitors
+            ]
+            if any(name.casefold() in team_names for name in names) or mentions_team(event):
+                matched.append(event)
+        return matched
+
+    def filter_standings(payload):
+        entries = []
+
+        def walk(node):
+            if isinstance(node, dict):
+                if "entries" in node and isinstance(node["entries"], list):
+                    for entry in node["entries"]:
+                        team = entry.get("team", {})
+                        display_name = team.get("displayName", "")
+                        if display_name.casefold() in team_names:
+                            entries.append(entry)
+                for value in node.values():
+                    walk(value)
+            elif isinstance(node, list):
+                for item in node:
+                    walk(item)
+
+        walk(payload)
+        return entries
+
+    def filter_news(payload):
+        articles = payload.get("articles", [])
+        return [article for article in articles if mentions_team(article)]
+
+    results = {"scores": []}
+    for day_offset in range(7):
+        game_date = start_date + timedelta(days=day_offset)
+        date_param = game_date.strftime("%Y%m%d")
+        scoreboard_url = (
+            f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/"
+            f"scoreboard?{urlencode({'dates': date_param})}"
+        )
+        scoreboard = fetch_json(scoreboard_url)
+        results["scores"].extend(filter_events(scoreboard.get("events", [])))
+
+    standings_url = (
+        f"https://site.api.espn.com/apis/v2/sports/{sport}/{league}/standings"
+    )
+    news_url = (
+        f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/"
+        f"news?{urlencode({'limit': 20})}"
+    )
+    results["standings"] = filter_standings(fetch_json(standings_url))
+    results["news"] = filter_news(fetch_json(news_url))
+
+    return {
+        "query": list_name,
+        "sport": sport,
+        "league": league,
+        "teams": list(teams),
+        "date_range": {
+            "start": start_date.isoformat(),
+            "end": end_date.isoformat(),
+        },
+        **results,
+    }

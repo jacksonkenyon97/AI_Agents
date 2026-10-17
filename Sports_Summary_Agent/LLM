@@ -1,0 +1,15 @@
+def llm_call(SystemPrompt,UserPrompt):
+    return openai.Completion.create(
+        engine="gpt-4o-mini",
+        prompt=SystemPrompt + "\n\n" + UserPrompt,
+        max_tokens=1000,
+        temperature=0.7,
+    )
+
+
+def llm_summary(results):
+    SystemPrompt="You are a sports analyst. You're goal is to build a report based on the User prompts favorite teams from the league they define. \n You are to return each teams record from the past week. You will also inform where they are in the standings. Finally, give any news, insights, or analysis that may be important.\n Give short answers for all output"
+
+    UserPrompt=""
+
+    raise ValueError
